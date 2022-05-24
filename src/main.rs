@@ -1,6 +1,8 @@
 extern crate sdl2;
 
 use std::cmp;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use sdl2::VideoSubsystem;
 use sdl2::event::Event;
@@ -10,6 +12,9 @@ use sdl2::mouse::Cursor;
 use sdl2::mouse::SystemCursor;
 use sdl2::rect::Rect;
 use sdl2::rect::Point;
+
+use captrs::Capturer;
+use captrs::Bgr8;
 
 struct CaptureContext {
     screen_dimensions: (u32, u32),
@@ -131,6 +136,34 @@ fn get_capture_context() -> Result<CaptureContext, String> {
     Ok(capture_context)
 }
 
+type Frame = Vec<Bgr8>;
+fn capture_frames(duration: usize, frame_rate: usize) -> Result<Vec<Frame>, String> {
+    let mut capturer = Capturer::new(0).unwrap();
+
+    let capture_start_time = Instant::now();
+    let sleep_time = 1000 / frame_rate;
+    let num_frames = duration / frame_rate + 1;
+    let mut frames: Vec<Frame> = Vec::with_capacity(num_frames);
+    loop {
+        let capture_duration = capture_start_time.elapsed();
+        if capture_duration.as_secs() > (duration as u64) {
+            break;
+        }
+
+        let frame = capturer.capture_frame();
+        match frame {
+            Ok(frame_data) => frames.push(frame_data),
+            _ => {
+                let err_str = format!("Failed to capture frame {}", frames.len());
+                return Err(err_str);
+            }
+        }
+        sleep(Duration::from_millis(sleep_time.try_into().unwrap()));
+    }
+
+    Ok(frames)
+}
+
 fn main() -> Result<(), String> {
     let capture_context = get_capture_context()?;
     let screen_dimensions = capture_context.screen_dimensions;
@@ -138,6 +171,11 @@ fn main() -> Result<(), String> {
 
     println!("Capture Screen Dimensions: {:?}", screen_dimensions);
     println!("Capture Area: {:?}", capture_area);
+
+    sleep(Duration::from_secs(1));
+
+    let frames = capture_frames(3, 10)?;
+    println!("Captured {} frames", frames.len());
 
     Ok(())
 }
