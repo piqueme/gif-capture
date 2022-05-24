@@ -17,7 +17,7 @@ use sdl2::rect::Point;
 use captrs::Capturer;
 use captrs::Bgr8;
 
-use image::{Rgb, RgbImage};
+use image::{Rgb, RgbImage, DynamicImage};
 
 use engiffen::{engiffen, Image};
 use engiffen::Quantizer::NeuQuant;
@@ -185,6 +185,17 @@ fn convert_rgb_to_image(image: RgbImage) -> Image {
     }
 }
 
+fn crop_image(image: RgbImage, crop_rect: Rect) -> RgbImage {
+    let dynamic_image = DynamicImage::ImageRgb8(image);
+    let cropped = dynamic_image.crop_imm(
+        crop_rect.x() as u32, 
+        crop_rect.y() as u32, 
+        crop_rect.width(), 
+        crop_rect.height()
+    );
+    cropped.into_rgb()
+}
+
 fn create_gif(frames: &[Image], frame_rate: usize, outfile: &str) -> Result<(), String> {
     let gif = engiffen(frames, frame_rate, NeuQuant(4)).unwrap(); // need to handle error
     let mut output = File::create(outfile).unwrap(); // need to handle error
@@ -210,6 +221,7 @@ fn main() -> Result<(), String> {
 
     let gif_images: Vec<_> = frames.into_iter()
         .map(|f| convert_frame_to_rgb(f, screen_dimensions.0, screen_dimensions.1))
+        .map(|i| crop_image(i, capture_context.capture_area))
         .map(convert_rgb_to_image)
         .collect();
 
