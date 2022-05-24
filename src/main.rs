@@ -2,6 +2,7 @@ extern crate sdl2;
 
 use std::cmp;
 use std::fs::File;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -21,6 +22,8 @@ use image::{Rgb, RgbImage, DynamicImage};
 
 use engiffen::{engiffen, Image};
 use engiffen::Quantizer::NeuQuant;
+
+use clap::Parser;
 
 struct CaptureContext {
     screen_dimensions: (u32, u32),
@@ -203,7 +206,25 @@ fn create_gif(frames: &[Image], frame_rate: usize, outfile: &str) -> Result<(), 
     Ok(())
 }
 
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    #[clap(short, long, default_value_t = 3)]
+    duration: usize,
+
+    #[clap(short, long, default_value_t = 10)]
+    frame_rate: usize,
+
+    #[clap(short, long, parse(from_os_str))]
+    outfile: PathBuf,
+
+    #[clap(short, long)]
+    scale: Option<usize>
+}
+
 fn main() -> Result<(), String> {
+    let cli = Cli::parse();
+
     let capture_context = get_capture_context()?;
     let screen_dimensions = capture_context.screen_dimensions;
     let capture_area = capture_context.capture_area;
@@ -213,17 +234,14 @@ fn main() -> Result<(), String> {
 
     sleep(Duration::from_secs(1));
 
-    let capture_duration = 3;
-    let frame_rate = 10;
-
-    let frames = capture_frames(capture_duration, frame_rate)?;
+    let frames = capture_frames(cli.duration, cli.frame_rate)?;
     println!("Captured {} frames", frames.len());
 
     let gif_images: Vec<_> = frames.into_iter()
         .map(|f| convert_frame_to_rgb(f, screen_dimensions.0, screen_dimensions.1))
-        .map(|i| crop_image(i, capture_context.capture_area))
+        .map(|i| crop_image(i, capture_area))
         .map(convert_rgb_to_image)
         .collect();
 
-    create_gif(&gif_images, frame_rate, "output.gif")
+    create_gif(&gif_images, cli.frame_rate, cli.outfile.to_str().unwrap())
 }
