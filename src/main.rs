@@ -1,6 +1,7 @@
 extern crate sdl2;
 
 use std::cmp;
+use std::fs::File;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -15,6 +16,11 @@ use sdl2::rect::Point;
 
 use captrs::Capturer;
 use captrs::Bgr8;
+
+use image::{Rgb, RgbImage};
+
+use engiffen::{engiffen, Image};
+use engiffen::Quantizer::NeuQuant;
 
 struct CaptureContext {
     screen_dimensions: (u32, u32),
@@ -164,6 +170,28 @@ fn capture_frames(duration: usize, frame_rate: usize) -> Result<Vec<Frame>, Stri
     Ok(frames)
 }
 
+fn convert_frame_to_rgb(frame: Frame, w: u32, h: u32) -> RgbImage {
+    RgbImage::from_fn(w, h, |x, y| {
+        let pixel = frame[(w * y + x) as usize];
+        Rgb([pixel.r, pixel.g, pixel.b])
+    })
+}
+
+fn convert_rgb_to_image(image: RgbImage) -> Image {
+    Image {
+        pixels: image.pixels().map(|p| [p[0], p[1], p[2], 255]).collect(),
+        width: image.width(),
+        height: image.height(),
+    }
+}
+
+fn create_gif(frames: &[Image], frame_rate: usize, outfile: &str) -> Result<(), String> {
+    let gif = engiffen(frames, frame_rate, NeuQuant(4)).unwrap(); // need to handle error
+    let mut output = File::create(outfile).unwrap(); // need to handle error
+    gif.write(&mut output).unwrap();
+    Ok(())
+}
+
 fn main() -> Result<(), String> {
     let capture_context = get_capture_context()?;
     let screen_dimensions = capture_context.screen_dimensions;
@@ -174,8 +202,16 @@ fn main() -> Result<(), String> {
 
     sleep(Duration::from_secs(1));
 
-    let frames = capture_frames(3, 10)?;
+    let capture_duration = 3;
+    let frame_rate = 10;
+
+    let frames = capture_frames(capture_duration, frame_rate)?;
     println!("Captured {} frames", frames.len());
 
-    Ok(())
+    let gif_images: Vec<_> = frames.into_iter()
+        .map(|f| convert_frame_to_rgb(f, screen_dimensions.0, screen_dimensions.1))
+        .map(convert_rgb_to_image)
+        .collect();
+
+    create_gif(&gif_images, frame_rate, "output.gif")
 }

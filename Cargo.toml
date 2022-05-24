@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 sdl2 = "0.35"
 captrs = "0.3"
+image = "0.23"
+engiffen = "0.8"
